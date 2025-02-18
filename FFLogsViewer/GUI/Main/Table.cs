@@ -243,10 +243,14 @@ public class Table
         if (Service.CharDataManager.PartyMembers.Count == 0)
         {
             ImGui.Text("Use");
-            using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.SameLine();
-            ImGui.Text(FontAwesomeIcon.Redo.ToIconString());
-            font.Pop();
+
+            {
+                using var font = ImRaii.PushFont(UiBuilder.IconFont);
+                ImGui.SameLine();
+                ImGui.Text(FontAwesomeIcon.Redo.ToIconString());
+                font.Pop();
+            }
+
             ImGui.SameLine();
             ImGui.Text("to refresh the party state.");
         }
@@ -607,10 +611,12 @@ public class Table
                         jobColor = GameDataManager.Jobs.FirstOrDefault(job => job.Id == charData.LoadedJobId)?.Color ?? jobColor;
                     }
 
-                    using var color = ImRaii.PushColor(ImGuiCol.Text, jobColor);
-                    Util.SelectableWithError($"{charData.FirstName}##Selectable{i}", charData);
-                    Util.LinkOpenOrPopup(charData);
-                    color.Pop();
+                    {
+                        using var color = ImRaii.PushColor(ImGuiCol.Text, jobColor);
+                        Util.SelectableWithError($"{charData.FirstName}##Selectable{i}", charData);
+                        Util.LinkOpenOrPopup(charData);
+                        color.Pop();
+                    }
 
                     if (charData.CharError == null)
                     {

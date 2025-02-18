@@ -26,7 +26,7 @@
   </ItemGroup>
 
     <PropertyGroup>
-        <DalamudLibPath>F:\XivLauncherCN\XIVLauncherCN\Roaming\addon\Hooks\dev\</DalamudLibPath>
+        <DalamudLibPath>$(appdata)\XIVLauncherCN\addon\Hooks\dev\</DalamudLibPath>
     </PropertyGroup>
 
   <ItemGroup>

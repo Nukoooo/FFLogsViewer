@@ -22,75 +22,87 @@ public class MenuBar
         if (ImGui.BeginMenuBar())
         {
             string clearHoverTooltip;
-            using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            if (Service.Configuration.IsCachingEnabled && Service.KeyState[VirtualKey.CONTROL])
+
             {
-                if (ImGui.MenuItem(FontAwesomeIcon.Trash.ToIconString()))
-                {
-                    Service.FFLogsClient.ClearCache();
-                    Service.CharDataManager.FetchLogs(true);
-                    Service.MainWindow.ResetSize();
-                }
+                using var font = ImRaii.PushFont(UiBuilder.IconFont);
 
-                clearHoverTooltip = "Clear cache and refresh current logs";
+                if (Service.Configuration.IsCachingEnabled && Service.KeyState[VirtualKey.CONTROL])
+                {
+                    if (ImGui.MenuItem(FontAwesomeIcon.Trash.ToIconString()))
+                    {
+                        Service.FFLogsClient.ClearCache();
+                        Service.CharDataManager.FetchLogs(true);
+                        Service.MainWindow.ResetSize();
+                    }
+
+                    clearHoverTooltip = "Clear cache and refresh current logs";
+                }
+                else
+                {
+                    if (ImGui.MenuItem(FontAwesomeIcon.Eraser.ToIconString()))
+                    {
+                        Service.CharDataManager.Reset();
+                        Service.MainWindow.ResetSize();
+                    }
+
+                    clearHoverTooltip = "Clear current view";
+
+                    if (Service.Configuration.IsCachingEnabled)
+                    {
+                        clearHoverTooltip += " (hold ctrl to clear cache)";
+                    }
+                }
             }
-            else
-            {
-                if (ImGui.MenuItem(FontAwesomeIcon.Eraser.ToIconString()))
-                {
-                    Service.CharDataManager.Reset();
-                    Service.MainWindow.ResetSize();
-                }
 
-                clearHoverTooltip = "Clear current view";
-                if (Service.Configuration.IsCachingEnabled)
-                {
-                    clearHoverTooltip += " (hold ctrl to clear cache)";
-                }
-            }
-
-            font.Pop();
             Util.SetHoverTooltip(clearHoverTooltip);
 
-            font.Push(UiBuilder.IconFont);
-            if (ImGui.MenuItem(FontAwesomeIcon.Cog.ToIconString()))
             {
-                Service.ConfigWindow.Toggle();
+                using var font = ImRaii.PushFont(UiBuilder.IconFont);
+
+                if (ImGui.MenuItem(FontAwesomeIcon.Cog.ToIconString()))
+                {
+                    Service.ConfigWindow.Toggle();
+                }
             }
 
-            ImGui.PopFont();
             Util.SetHoverTooltip(Service.Localization.GetString("Configuration"));
 
             var swapViewIcon = Service.MainWindow.IsPartyView ? FontAwesomeIcon.User : FontAwesomeIcon.Users;
-            font.Push(UiBuilder.IconFont);
-            if (ImGui.MenuItem(swapViewIcon.ToIconString()))
-            {
-                if (Service.FFLogsClient.IsTokenValid)
-                {
-                    Service.MainWindow.IsPartyView = !Service.MainWindow.IsPartyView;
-                    if (Service.MainWindow.IsPartyView)
-                    {
-                        Service.CharDataManager.UpdatePartyMembers();
-                    }
-                    else if (Service.CharDataManager.DisplayedChar.IsInfoSet())
-                    {
-                        Service.CharDataManager.DisplayedChar.FetchLogs();
-                    }
 
-                    Service.MainWindow.ResetSize();
+            {
+                using var font = ImRaii.PushFont(UiBuilder.IconFont);
+
+                if (ImGui.MenuItem(swapViewIcon.ToIconString()))
+                {
+                    if (Service.FFLogsClient.IsTokenValid)
+                    {
+                        Service.MainWindow.IsPartyView = !Service.MainWindow.IsPartyView;
+
+                        if (Service.MainWindow.IsPartyView)
+                        {
+                            Service.CharDataManager.UpdatePartyMembers();
+                        }
+                        else if (Service.CharDataManager.DisplayedChar.IsInfoSet())
+                        {
+                            Service.CharDataManager.DisplayedChar.FetchLogs();
+                        }
+
+                        Service.MainWindow.ResetSize();
+                    }
                 }
             }
 
-            font.Pop();
             Util.SetHoverTooltip(Service.MainWindow.IsPartyView ? "Swap to single view" : "Swap to party view");
 
-            font.Push(UiBuilder.IconFont);
-            if (ImGui.MenuItem(FontAwesomeIcon.History.ToIconString()))
             {
-                ImGui.OpenPopup("##History");
+                using var font = ImRaii.PushFont(UiBuilder.IconFont);
+
+                if (ImGui.MenuItem(FontAwesomeIcon.History.ToIconString()))
+                {
+                    ImGui.OpenPopup("##History");
+                }
             }
 
-            font.Pop();
             Util.SetHoverTooltip("History");
 
             DrawHistoryPopup();
@@ -109,10 +121,11 @@ public class MenuBar
                 foreach (var job in GameDataManager.Jobs)
                 {
                     color.Push(ImGuiCol.Text, job.Color);
+
                     if (ImGui.MenuItem(job.Name))
                     {
                         Service.MainWindow.Job = job;
-                        hasTmpSettingChanged = true;
+                        hasTmpSettingChanged   = true;
                     }
 
                     color.Pop();
@@ -180,15 +193,16 @@ public class MenuBar
                 color.Push(ImGuiCol.Text, Vector4.Zero);
             }
 
-            font.Push(UiBuilder.IconFont);
-
-            ImGui.SameLine();
-            if (ImGui.MenuItem(FontAwesomeIcon.InfoCircle.ToIconString()))
             {
-                ImGui.OpenPopup("##UpdateMessage");
-            }
+                using var font = ImRaii.PushFont(UiBuilder.IconFont);
 
-            font.Pop();
+                ImGui.SameLine();
+
+                if (ImGui.MenuItem(FontAwesomeIcon.InfoCircle.ToIconString()))
+                {
+                    ImGui.OpenPopup("##UpdateMessage");
+                }
+            }
 
             if (isButtonHidden)
             {
@@ -210,18 +224,20 @@ public class MenuBar
                 ImGui.Text("Reminder on existing feature:");
                 ImGui.Text("- Party view stat layout:");
 
-                font.Push(UiBuilder.IconFont);
-                ImGui.SameLine();
-                ImGui.Text(FontAwesomeIcon.ExchangeAlt.ToIconString());
-                font.Pop();
+                {
+                    using var font = ImRaii.PushFont(UiBuilder.IconFont);
+                    ImGui.SameLine();
+                    ImGui.Text(FontAwesomeIcon.ExchangeAlt.ToIconString());
+                }
 
                 ImGui.Text("   The stat layout in the party view allows to see all stats for a specific encounter.");
                 ImGui.Text("   You can also use the button with this icon to set the default encounter used in that layout (e.g., the new Chaotic): ");
 
-                font.Push(UiBuilder.IconFont);
-                ImGui.SameLine();
-                ImGui.Text(FontAwesomeIcon.Star.ToIconString());
-                font.Pop();
+                {
+                    using var font = ImRaii.PushFont(UiBuilder.IconFont);
+                    ImGui.SameLine();
+                    ImGui.Text(FontAwesomeIcon.Star.ToIconString());
+                }
 
                 ImGui.Text("   Fun fact, that button also works in the encounter layout to choose the default stats!");
 
