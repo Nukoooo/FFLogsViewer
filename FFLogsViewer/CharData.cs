@@ -67,7 +67,7 @@ public class CharData
 
     public bool SetInfo(IPlayerCharacter playerCharacter)
     {
-        if (playerCharacter.HomeWorld.GameData?.Name == null)
+        if (!playerCharacter.HomeWorld.IsValid)
         {
             this.CharError = CharacterError.GenericError;
             Service.PluginLog.Error("SetInfo character world was null");
@@ -75,7 +75,7 @@ public class CharData
         }
 
         this.FirstName = playerCharacter.Name.TextValue;
-        this.WorldName = playerCharacter.HomeWorld.GameData.Name.ToString();
+        this.WorldName = playerCharacter.HomeWorld.Value.Name.ToString();
         return true;
     }
 
@@ -195,7 +195,7 @@ public class CharData
             var properties = character.Properties();
             foreach (var prop in properties)
             {
-                if (prop.Name != "hidden")
+                if (prop.Value != null && prop.Name != "hidden")
                 {
                     this.ParseZone(prop.Value);
                 }
@@ -328,9 +328,9 @@ public class CharData
             var obj = Service.ObjectTable[i];
             if (obj is IPlayerCharacter playerCharacter
                 && playerCharacter.Name.TextValue == fullName
-                && playerCharacter.HomeWorld.GameData?.Name.RawString == this.WorldName)
+                && playerCharacter.HomeWorld.ValueNullable?.Name == this.WorldName)
             {
-                this.JobId = playerCharacter.ClassJob.Id;
+                this.JobId = playerCharacter.ClassJob.RowId;
                 return;
             }
         }

@@ -5,6 +5,7 @@ using Dalamud.Game.ClientState.Keys;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using FFLogsViewer.Manager;
 using ImGuiNET;
 
@@ -14,18 +15,20 @@ public class MenuBar
 {
     public static void Draw()
     {
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(6 * ImGuiHelpers.GlobalScale, ImGui.GetStyle().ItemSpacing.Y));
+        using var style = ImRaii.PushStyle(
+            ImGuiStyleVar.ItemSpacing,
+            new Vector2(6 * ImGuiHelpers.GlobalScale, ImGui.GetStyle().ItemSpacing.Y));
 
         if (ImGui.BeginMenuBar())
         {
             string clearHoverTooltip;
-            ImGui.PushFont(UiBuilder.IconFont);
+            using var font = ImRaii.PushFont(UiBuilder.IconFont);
             if (Service.Configuration.IsCachingEnabled && Service.KeyState[VirtualKey.CONTROL])
             {
                 if (ImGui.MenuItem(FontAwesomeIcon.Trash.ToIconString()))
                 {
                     Service.FFLogsClient.ClearCache();
-                    Service.CharDataManager.FetchLogs();
+                    Service.CharDataManager.FetchLogs(true);
                     Service.MainWindow.ResetSize();
                 }
 
@@ -46,10 +49,10 @@ public class MenuBar
                 }
             }
 
-            ImGui.PopFont();
+            font.Pop();
             Util.SetHoverTooltip(clearHoverTooltip);
 
-            ImGui.PushFont(UiBuilder.IconFont);
+            font.Push(UiBuilder.IconFont);
             if (ImGui.MenuItem(FontAwesomeIcon.Cog.ToIconString()))
             {
                 Service.ConfigWindow.Toggle();
@@ -59,7 +62,7 @@ public class MenuBar
             Util.SetHoverTooltip(Service.Localization.GetString("Configuration"));
 
             var swapViewIcon = Service.MainWindow.IsPartyView ? FontAwesomeIcon.User : FontAwesomeIcon.Users;
-            ImGui.PushFont(UiBuilder.IconFont);
+            font.Push(UiBuilder.IconFont);
             if (ImGui.MenuItem(swapViewIcon.ToIconString()))
             {
                 if (Service.FFLogsClient.IsTokenValid)
@@ -78,16 +81,16 @@ public class MenuBar
                 }
             }
 
-            ImGui.PopFont();
+            font.Pop();
             Util.SetHoverTooltip(Service.MainWindow.IsPartyView ? "Swap to single view" : "Swap to party view");
 
-            ImGui.PushFont(UiBuilder.IconFont);
+            font.Push(UiBuilder.IconFont);
             if (ImGui.MenuItem(FontAwesomeIcon.History.ToIconString()))
             {
                 ImGui.OpenPopup("##History");
             }
 
-            ImGui.PopFont();
+            font.Pop();
             Util.SetHoverTooltip("History");
 
             DrawHistoryPopup();
@@ -100,25 +103,25 @@ public class MenuBar
                 jobColor = GameDataManager.Jobs.FirstOrDefault(job => job.Id == Service.CharDataManager.DisplayedChar.LoadedJobId)?.Color ?? jobColor;
             }
 
-            ImGui.PushStyleColor(ImGuiCol.Text, jobColor);
+            using var color = ImRaii.PushColor(ImGuiCol.Text, jobColor);
             if (ImGui.BeginMenu(Service.MainWindow.Job.Abbreviation))
             {
                 foreach (var job in GameDataManager.Jobs)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, job.Color);
-                    if (ImGui.MenuItem(Service.Localization.GetString(job.Name)))
+                    color.Push(ImGuiCol.Text, job.Color);
+                    if (ImGui.MenuItem(job.Name))
                     {
                         Service.MainWindow.Job = job;
                         hasTmpSettingChanged = true;
                     }
 
-                    ImGui.PopStyleColor();
+                    color.Pop();
                 }
 
                 ImGui.EndMenu();
             }
 
-            ImGui.PopStyleColor();
+            color.Pop();
 
             if (ImGui.BeginMenu(Service.MainWindow.GetCurrentMetric().Abbreviation))
             {
@@ -171,13 +174,13 @@ public class MenuBar
                 Service.CharDataManager.FetchLogs();
             }
 
-            var isButtonHidden = Service.Configuration.IsUpdateDismissed2100 || (!ImGui.IsPopupOpen("##UpdateMessage") && DateTime.Now.Second % 2 == 0);
+            var isButtonHidden = Service.Configuration.IsUpdateDismissed2213 || (!ImGui.IsPopupOpen("##UpdateMessage") && DateTime.Now.Second % 2 == 0);
             if (isButtonHidden)
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, Vector4.Zero);
+                color.Push(ImGuiCol.Text, Vector4.Zero);
             }
 
-            ImGui.PushFont(UiBuilder.IconFont);
+            font.Push(UiBuilder.IconFont);
 
             ImGui.SameLine();
             if (ImGui.MenuItem(FontAwesomeIcon.InfoCircle.ToIconString()))
@@ -185,58 +188,63 @@ public class MenuBar
                 ImGui.OpenPopup("##UpdateMessage");
             }
 
-            ImGui.PopFont();
+            font.Pop();
 
             if (isButtonHidden)
             {
-                ImGui.PopStyleColor();
+                color.Pop();
             }
 
-            Util.SetHoverTooltip("Update message");
+            Util.SetHoverTooltip("Update message, click to open");
 
             if (ImGui.BeginPopup("##UpdateMessage", ImGuiWindowFlags.NoMove))
             {
-                ImGui.Text("New feature:");
-                ImGui.Text("- Party view:");
+                ImGui.Text("Small late feature notice, because it seems like some missed it:");
+                ImGui.Text("- Alliance swap:");
 
-                ImGui.PushFont(UiBuilder.IconFont);
+                ImGui.Text("   You can swap the displayed alliance in the party view.\n" +
+                               "   The button will now always be displayed.");
+
+                ImGui.NewLine();
+
+                ImGui.Text("Reminder on existing feature:");
+                ImGui.Text("- Party view stat layout:");
+
+                font.Push(UiBuilder.IconFont);
                 ImGui.SameLine();
-                ImGui.Text(FontAwesomeIcon.Users.ToIconString());
-                ImGui.PopFont();
+                ImGui.Text(FontAwesomeIcon.ExchangeAlt.ToIconString());
+                font.Pop();
 
-                ImGui.Text("   Using the 3rd button on this line, you will switch the main window to party view.\n" +
-                           "   This view allows you to easily see the logs of your current party.\n" +
-                           "   Two layouts are available:\n" +
-                           "      - Encounter layout: one stat => all encounters\n" +
-                           "      - Stat layout: one encounter => all stats\n");
-                ImGui.Text("Misc changes:");
-                ImGui.Text("- Cache:");
+                ImGui.Text("   The stat layout in the party view allows to see all stats for a specific encounter.");
+                ImGui.Text("   You can also use the button with this icon to set the default encounter used in that layout (e.g., the new Chaotic): ");
 
-                ImGui.PushFont(UiBuilder.IconFont);
+                font.Push(UiBuilder.IconFont);
                 ImGui.SameLine();
-                ImGui.Text(FontAwesomeIcon.Trash.ToIconString());
-                ImGui.PopFont();
+                ImGui.Text(FontAwesomeIcon.Star.ToIconString());
+                font.Pop();
 
-                ImGui.Text("   Requests are now cached.\n" +
-                           "   The cache is cleared every hour and the 4th button on this line allows you to clear it manually.\n" +
-                           "   You can disable this in the settings if you wish to.");
-                ImGui.Text("- New style setting to abbreviate job names");
-                ImGui.Text("\nIf you encounter any problem or if you have a suggestion, feel free to open an issue on the GitHub:");
+                ImGui.Text("   Fun fact, that button also works in the encounter layout to choose the default stats!");
+
+                ImGui.NewLine();
+
+                ImGui.Text("If you encounter any problem or if you have a suggestion, feel free to open an issue on the GitHub:");
 
                 if (ImGui.Button("Open the GitHub repo"))
                 {
                     Util.OpenLink("https://github.com/Aireil/FFLogsViewer");
                 }
 
-                if (ImGui.Button("Hide##UpdateMessage"))
+                ImGui.SameLine();
+                ImGui.TextColored(ImGuiColors.DalamudGrey, "I do enjoy GitHub stars if you want to give one to the repo, thank you! :)");
+
+                ImGui.NewLine();
+
+                if (ImGui.Button("Dismiss and hide##UpdateMessage"))
                 {
-                    Service.Configuration.IsUpdateDismissed2100 = true;
+                    Service.Configuration.IsUpdateDismissed2213 = true;
                     Service.Configuration.Save();
                     ImGui.CloseCurrentPopup();
                 }
-
-                ImGui.SameLine();
-                ImGui.TextColored(ImGuiColors.DalamudGrey, "Click on the same spot to open this again.");
 
                 ImGui.EndPopup();
             }
@@ -244,7 +252,7 @@ public class MenuBar
             ImGui.EndMenuBar();
         }
 
-        ImGui.PopStyleVar();
+        style.Pop();
     }
 
     public static void DrawHistoryPopup()

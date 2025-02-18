@@ -5,5 +5,9 @@ public class TeamMember
     public string FirstName = null!;
     public string World = null!;
     public uint JobId;
-    public bool IsInParty;
+
+    /// <summary>
+    /// Null if in the local player party.
+    /// </summary>
+    public uint? AllianceIndex;
 }

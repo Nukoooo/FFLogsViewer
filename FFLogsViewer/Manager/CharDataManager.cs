@@ -4,7 +4,7 @@ using System.Linq;
 using FFLogsViewer.Model;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.System.Framework;
-using Lumina.Excel.GeneratedSheets;
+using Lumina.Excel.Sheets;
 
 namespace FFLogsViewer.Manager;
 
@@ -12,18 +12,38 @@ public class CharDataManager
 {
     public CharData DisplayedChar = new();
     public List<CharData> PartyMembers = [];
+    public bool IsCurrPartyAnAlliance;
     public string[] ValidWorlds;
 
-    public void UpdatePartyMembers(bool onlyFetchNewMembers = false)
+    private uint? currentAllianceIndex;
+
+    public void UpdatePartyMembers(bool forceLocalPlayerParty = true)
     {
+        if (forceLocalPlayerParty)
+        {
+            this.currentAllianceIndex = null;
+        }
+
         Service.TeamManager.UpdateTeamList();
         var localPLayer = Service.ClientState.LocalPlayer;
-        var currPartyMembers = Service.TeamManager.TeamList.Where(teamMember => teamMember.IsInParty).ToList();
+        var currPartyMembers = Service.TeamManager.TeamList.Where(teamMember => teamMember.AllianceIndex == this.currentAllianceIndex).ToList();
+        this.IsCurrPartyAnAlliance = this.currentAllianceIndex != null;
 
-        if (!Service.Configuration.Style.IsLocalPlayerInPartyView)
+        // the alliance is empty, force local player party
+        if (this.IsCurrPartyAnAlliance && currPartyMembers.Count == 0)
+        {
+            this.currentAllianceIndex = null; // not needed, but just in case, careful when touching the code in this method /!\
+
+            // ReSharper disable once TailRecursiveCall
+            // ReSharper disable once RedundantArgumentDefaultValue
+            this.UpdatePartyMembers(true);
+            return;
+        }
+
+        if (!Service.Configuration.Style.IsLocalPlayerInPartyView && !this.IsCurrPartyAnAlliance)
         {
             var index = currPartyMembers.FindIndex(member => $"{member.FirstName}" == localPLayer?.Name.TextValue
-                                                             && member.World == localPLayer.HomeWorld.GameData?.Name.RawString);
+                                                             && member.World == localPLayer.HomeWorld.ValueNullable?.Name);
             if (index >= 0)
             {
                 currPartyMembers.RemoveAt(index);
@@ -53,18 +73,18 @@ public class CharDataManager
                 member => member.FirstName == charData.FirstName &&
                           member.World == charData.WorldName)).ToList();
 
-        this.FetchLogs(onlyFetchNewMembers);
+        this.FetchLogs();
     }
 
     public CharDataManager()
     {
-        var worlds = Service.DataManager.GetExcelSheet<World>()?.Where(Util.IsWorldValid);
+        var worlds = Service.DataManager.GetExcelSheet<World>().Where(Util.IsWorldValid);
         if (worlds == null)
         {
             throw new InvalidOperationException("Sheets weren't ready.");
         }
 
-        this.ValidWorlds = worlds.Select(world => world.Name.RawString).ToArray();
+        this.ValidWorlds = worlds.Select(world => world.Name.ToString()).ToArray();
     }
 
     public static string GetRegionCode(string worldName)
@@ -112,17 +132,16 @@ public class CharDataManager
         }
     }
 
-    public void FetchLogs(bool onlyFetchNewMembers = false)
+    public void FetchLogs(bool ignoreErrors = false)
     {
         if (Service.MainWindow.IsPartyView)
         {
             foreach (var partyMember in this.PartyMembers)
             {
-                if (partyMember.IsInfoSet() && (!onlyFetchNewMembers
-                                                || (!partyMember.IsDataReady
-                                                    && (partyMember.CharError == null
-                                                        || (partyMember.CharError != CharacterError.CharacterNotFoundFFLogs
-                                                            && partyMember.CharError != CharacterError.HiddenLogs)))))
+                if (partyMember.IsInfoSet() && (ignoreErrors
+                                                || partyMember.CharError == null
+                                                || (partyMember.CharError != CharacterError.CharacterNotFoundFFLogs
+                                                    && partyMember.CharError != CharacterError.HiddenLogs)))
                 {
                     partyMember.FetchLogs();
                 }
@@ -142,10 +161,18 @@ public class CharDataManager
         if (Service.MainWindow.IsPartyView)
         {
             this.PartyMembers.Clear();
+            this.currentAllianceIndex = null;
+            this.IsCurrPartyAnAlliance = false;
         }
         else
         {
             this.DisplayedChar = new CharData();
         }
+    }
+
+    public void SwapAlliance()
+    {
+        this.currentAllianceIndex = Service.TeamManager.GetNextAllianceIndex(this.currentAllianceIndex);
+        this.UpdatePartyMembers(false);
     }
 }

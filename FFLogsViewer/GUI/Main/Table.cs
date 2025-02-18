@@ -6,6 +6,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
 using FFLogsViewer.Manager;
 using FFLogsViewer.Model;
@@ -102,10 +103,13 @@ public class Table
                 hoverMessage = "No data available.\n" +
                                "\n" +
                                "This error is expected when the encounter is a recent addition to the layout or is not yet listed on FF Logs.\n" +
-                               "If neither of these is the case, please " +
+                               "It can also be caused by an issue with FF Logs API, please check if the zone is visible on the character's page on FF Logs' website." +
+                               "\n\n" +
+                               "If you see it properly on the website, please " +
                                (Service.Configuration.IsDefaultLayout
                                     ? "report the issue on GitHub."
-                                    : "try adding the encounter again.");
+                                    : "try adding the encounter again.")
+                               ;
             }
         }
         else if (encounter is { IsLockedIn: false })
@@ -198,6 +202,24 @@ public class Table
         }
     }
 
+    private static void DrawAllianceSwapButton()
+    {
+        ImGui.BeginDisabled(!Service.TeamManager.HasAllianceMembers);
+
+        //  == mouse character from game's font
+        if (ImGui.Selectable("Alliance swap ##PartyViewAllianceSwap"))
+        {
+            Service.CharDataManager.SwapAlliance();
+        }
+
+        ImGui.EndDisabled();
+
+        if (!Service.TeamManager.HasAllianceMembers)
+        {
+            Util.SetHoverTooltip("Not in an alliance", true);
+        }
+    }
+
     private static void DrawHeaderSeparator()
     {
         if (Service.Configuration.Style.IsHeaderSeparatorDrawn)
@@ -221,10 +243,10 @@ public class Table
         if (Service.CharDataManager.PartyMembers.Count == 0)
         {
             ImGui.Text("Use");
-            ImGui.PushFont(UiBuilder.IconFont);
+            using var font = ImRaii.PushFont(UiBuilder.IconFont);
             ImGui.SameLine();
             ImGui.Text(FontAwesomeIcon.Redo.ToIconString());
-            ImGui.PopFont();
+            font.Pop();
             ImGui.SameLine();
             ImGui.Text("to refresh the party state.");
         }
@@ -246,7 +268,7 @@ public class Table
 
         if (Util.DrawButtonIcon(FontAwesomeIcon.Redo))
         {
-            Service.CharDataManager.UpdatePartyMembers();
+            Service.CharDataManager.UpdatePartyMembers(false);
         }
 
         Util.SetHoverTooltip("Refresh party state");
@@ -294,26 +316,30 @@ public class Table
 
         this.DrawEncounterHeader();
 
+        var nbColumns = Service.Configuration.Style.IsLocalPlayerInPartyView || Service.CharDataManager.IsCurrPartyAnAlliance ? 9 : 8;
+        var nbChars = nbColumns - 1;
+
         if (ImGui.BeginTable(
                 "##MainWindowTablePartyViewEncounterLayout",
-                Service.Configuration.Style.IsLocalPlayerInPartyView ? 9 : 8,
+                nbColumns,
                 Service.Configuration.Style.MainTableFlags))
         {
             ImGui.TableNextColumn();
 
-            var separatorY = ImGui.GetCursorPosY();
-            if (Service.Configuration.Style.IsHeaderSeparatorDrawn && displayedEntries[0].Type != LayoutEntryType.Header)
-            {
-                ImGui.Separator();
-            }
+            var iconSize = Util.Round(25 * ImGuiHelpers.GlobalScale);
 
-            for (var i = 0; i < (Service.Configuration.Style.IsLocalPlayerInPartyView ? 8 : 7); i++)
+            var posY = ImGui.GetCursorPosY() + (ImGui.GetStyle().ItemSpacing.Y + iconSize);
+            ImGui.SetCursorPosY(posY);
+
+            DrawAllianceSwapButton();
+
+            var firstLineAfterNamesCursorPosY = 0.0f;
+            for (var i = 0; i < nbChars; i++)
             {
                 var charData = i < currentParty.Count ? currentParty[i] : null;
 
                 ImGui.TableNextColumn();
 
-                var iconSize = Util.Round(25 * ImGuiHelpers.GlobalScale);
                 Util.CenterCursor(iconSize);
                 ImGui.Image(Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Util.GetJobIconId(charData?.JobId ?? 0))).GetWrapOrEmpty().ImGuiHandle, new Vector2(iconSize));
 
@@ -325,11 +351,11 @@ public class Table
                         jobColor = GameDataManager.Jobs.FirstOrDefault(job => job.Id == charData.LoadedJobId)?.Color ?? jobColor;
                     }
 
-                    ImGui.PushStyleColor(ImGuiCol.Text, jobColor);
+                    using var color = ImRaii.PushColor(ImGuiCol.Text, jobColor);
                     Util.CenterSelectableWithError(charData.Abbreviation + $"##Selectable{i}", charData);
                     Util.LinkOpenOrPopup(charData);
 
-                    ImGui.PopStyleColor();
+                    color.Pop();
 
                     if (charData.CharError == null)
                     {
@@ -341,10 +367,18 @@ public class Table
                     Util.CenterText("-");
                 }
 
-                ImGui.SetCursorPosY(separatorY);
-                if (Service.Configuration.Style.IsHeaderSeparatorDrawn && displayedEntries[0].Type != LayoutEntryType.Header)
+                firstLineAfterNamesCursorPosY = ImGui.GetCursorPosY();
+            }
+
+            if (Service.Configuration.Style.IsHeaderSeparatorDrawn && displayedEntries[0].Type != LayoutEntryType.Header)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                for (var i = 0; i < nbColumns; i++)
                 {
+                    ImGui.SetCursorPosY(firstLineAfterNamesCursorPosY);
                     ImGui.Separator();
+                    ImGui.TableNextColumn();
                 }
             }
 
@@ -359,7 +393,7 @@ public class Table
                 {
                     this.DrawStatAlias(entry, row);
 
-                    for (var i = 0; i < (Service.Configuration.Style.IsLocalPlayerInPartyView ? 8 : 7); i++)
+                    for (var i = 0; i < nbChars; i++)
                     {
                         ImGui.TableNextColumn();
                         var charData = i < currentParty.Count ? currentParty[i] : null;
@@ -370,7 +404,7 @@ public class Table
                 {
                     this.DrawEncounterName(entry, entry.Alias == string.Empty ? entry.Encounter : entry.Alias, string.Empty, row);
 
-                    for (var i = 0; i < (Service.Configuration.Style.IsLocalPlayerInPartyView ? 8 : 7); i++)
+                    for (var i = 0; i < nbChars; i++)
                     {
                         ImGui.TableNextColumn();
                         var charData = i < currentParty.Count ? currentParty[i] : null;
@@ -527,6 +561,9 @@ public class Table
             ImGui.TableNextColumn();
 
             var separatorY = ImGui.GetCursorPosY() + ImGui.GetFontSize() + ImGui.GetStyle().ItemSpacing.Y;
+
+            DrawAllianceSwapButton();
+
             ImGui.SetCursorPosY(separatorY);
             if (Service.Configuration.Style.IsHeaderSeparatorDrawn)
             {
@@ -545,7 +582,8 @@ public class Table
                 }
             }
 
-            for (var i = 0; i < (Service.Configuration.Style.IsLocalPlayerInPartyView ? 8 : 7); i++)
+            var nbChars = Service.Configuration.Style.IsLocalPlayerInPartyView || Service.CharDataManager.IsCurrPartyAnAlliance ? 8 : 7;
+            for (var i = 0; i < nbChars; i++)
             {
                 var charData = i < currentParty.Count ? currentParty[i] : null;
 
@@ -569,11 +607,10 @@ public class Table
                         jobColor = GameDataManager.Jobs.FirstOrDefault(job => job.Id == charData.LoadedJobId)?.Color ?? jobColor;
                     }
 
-                    ImGui.PushStyleColor(ImGuiCol.Text, jobColor);
+                    using var color = ImRaii.PushColor(ImGuiCol.Text, jobColor);
                     Util.SelectableWithError($"{charData.FirstName}##Selectable{i}", charData);
                     Util.LinkOpenOrPopup(charData);
-
-                    ImGui.PopStyleColor();
+                    color.Pop();
 
                     if (charData.CharError == null)
                     {
@@ -672,16 +709,17 @@ public class Table
 
     private void DrawEncounterName(LayoutEntry entry, string encounterName, string hoverMessage, int row)
     {
+        ImRaii.Color color = new();
         if (!hoverMessage.IsNullOrEmpty())
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
+            color.Push(ImGuiCol.Text, ImGuiColors.DalamudGrey);
         }
 
         this.DrawSwapAlias(entry, encounterName, row);
 
         if (!hoverMessage.IsNullOrEmpty())
         {
-            ImGui.PopStyleColor();
+            color.Pop();
             Util.SetHoverTooltip(hoverMessage);
         }
     }

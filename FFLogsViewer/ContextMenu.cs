@@ -1,7 +1,6 @@
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Memory;
 using FFLogsViewer.Manager;
-using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace FFLogsViewer;
@@ -41,9 +40,7 @@ public class ContextMenu
             case "CrossWorldLinkshell":
             case "ContentMemberList": // Eureka/Bozja/...
             case "BeginnerChatList":
-            {
-                return menuTargetDefault.TargetName != string.Empty && Util.IsWorldValid(menuTargetDefault.TargetHomeWorld.Id);
-            }
+                return menuTargetDefault.TargetName != string.Empty && Util.IsWorldValid(menuTargetDefault.TargetHomeWorld.RowId);
 
             case "BlackList":
             case "MuteList":
@@ -71,7 +68,7 @@ public class ContextMenu
         }
         else
         {
-            var world = Util.GetWorld(menuTargetDefault.TargetHomeWorld.Id);
+            var world = Util.GetWorld(menuTargetDefault.TargetHomeWorld.RowId);
             if (!Util.IsWorldValid(world))
             {
                 return;
@@ -140,7 +137,7 @@ public class ContextMenu
 
     private static unsafe string GetBlacklistSelectFullName()
     {
-        var agentBlackList = (AgentBlacklist*)Framework.Instance()->GetUIModule()->GetAgentModule()->GetAgentByInternalId(AgentId.Blacklist);
+        var agentBlackList = AgentBlacklist.Instance();
         if (agentBlackList != null)
         {
             return MemoryHelper.ReadSeString(&agentBlackList->SelectedPlayerFullName).TextValue;
@@ -151,10 +148,10 @@ public class ContextMenu
 
     private static unsafe string GetMuteListSelectFullName()
     {
-        var agentMuteList = Framework.Instance()->GetUIModule()->GetAgentModule()->GetAgentByInternalId(AgentId.Mutelist);
+        var agentMuteList = AgentMutelist.Instance();
         if (agentMuteList != null)
         {
-            return MemoryHelper.ReadSeStringNullTerminated(*(nint*)((nint)agentMuteList + 0x68)).TextValue; // should create the agent in CS later
+            return MemoryHelper.ReadSeString(&agentMuteList->SelectedPlayerFullName).TextValue;
         }
 
         return string.Empty;

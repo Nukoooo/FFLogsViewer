@@ -5,10 +5,11 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
 using FFLogsViewer.Manager;
 using FFLogsViewer.Model;
 using ImGuiNET;
-using Lumina.Excel.GeneratedSheets;
+using Lumina.Excel.Sheets;
 using Action = System.Action;
 
 namespace FFLogsViewer;
@@ -17,29 +18,30 @@ public class Util
 {
     public static bool DrawButtonIcon(FontAwesomeIcon icon, Vector2? size = null)
     {
-        ImGui.PushFont(UiBuilder.IconFont);
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
+        using ImRaii.Style style = new();
         if (size != null)
         {
-            ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, size.Value);
+            style.Push(ImGuiStyleVar.FramePadding, size.Value);
         }
 
         var ret = ImGui.Button(icon.ToIconString());
 
         if (size != null)
         {
-            ImGui.PopStyleVar();
+            style.Pop();
         }
 
-        ImGui.PopFont();
+        font.Pop();
 
         return ret;
     }
 
     public static bool DrawDisabledButton(string? label, bool isDisabled)
     {
-        ImGui.PushStyleVar(ImGuiStyleVar.Alpha, isDisabled ? 0.5f : 1.0f);
+        using var style = ImRaii.PushStyle(ImGuiStyleVar.Alpha, isDisabled ? 0.5f : 1.0f);
         var ret = ImGui.Button(label);
-        ImGui.PopStyleVar();
+        style.Pop();
 
         return ret;
     }
@@ -96,14 +98,14 @@ public class Util
         CenterCursor(ImGui.CalcTextSize(text, true).X);
     }
 
-    public static void CenterText(string text, Vector4? color = null)
+    public static void CenterText(string text, Vector4? textColor = null)
     {
         CenterCursor(text);
 
-        color ??= ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.Text));
-        ImGui.PushStyleColor(ImGuiCol.Text, color.Value);
+        textColor ??= ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.Text));
+        using var color = ImRaii.PushColor(ImGuiCol.Text, textColor.Value);
         ImGui.TextUnformatted(text);
-        ImGui.PopStyleColor();
+        color.Pop();
     }
 
     public static void CenterError(CharData charData)
@@ -139,35 +141,35 @@ public class Util
         }
     }
 
-    public static bool CenterSelectable(string text, Vector4? color = null)
+    public static bool CenterSelectable(string text, Vector4? textColor = null)
     {
         CenterCursor(text);
 
-        color ??= ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.Text));
-        ImGui.PushStyleColor(ImGuiCol.Text, color.Value);
+        textColor ??= ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.Text));
+        using var color = ImRaii.PushColor(ImGuiCol.Text, textColor.Value);
         var ret = ImGui.Selectable(text, false, ImGuiSelectableFlags.None, ImGui.CalcTextSize(text, true));
-        ImGui.PopStyleColor();
+        color.Pop();
 
         return ret;
     }
 
     public static void SelectableWithError(string text, CharData charData)
     {
-        var color = charData.CharError != null
+        var textColor = charData.CharError != null
                         ? GetErrorColor(charData)
                         : ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32(ImGuiCol.Text));
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        using var color = ImRaii.PushColor(ImGuiCol.Text, textColor);
         ImGui.Selectable(text);
-        ImGui.PopStyleColor();
+        color.Pop();
         if (charData.CharError != null)
         {
             SetHoverTooltip(GetErrorMessage(charData));
         }
     }
 
-    public static void SetHoverTooltip(string? tooltip)
+    public static void SetHoverTooltip(string tooltip, bool allowWhenDisabled = false)
     {
-        if (ImGui.IsItemHovered())
+        if (ImGui.IsItemHovered(allowWhenDisabled ? ImGuiHoveredFlags.AllowWhenDisabled : ImGuiHoveredFlags.None))
         {
             ImGui.BeginTooltip();
             ImGui.TextUnformatted(tooltip);
@@ -324,7 +326,7 @@ public class Util
 
     public static bool IsWorldValid(World world)
     {
-        if (world.Name.RawData.IsEmpty || GetRegionCode(world) == string.Empty)
+        if (world.Name.IsEmpty || GetRegionCode(world) == string.Empty)
         {
             return false;
         }
@@ -334,9 +336,8 @@ public class Util
 
     public static World GetWorld(uint worldId)
     {
-        var worldSheet = Service.DataManager.GetExcelSheet<World>()!;
-        var world = worldSheet.FirstOrDefault(x => x.RowId == worldId);
-        if (world == null)
+        var worldSheet = Service.DataManager.GetExcelSheet<World>();
+        if (!worldSheet.TryGetRow(worldId, out var world))
         {
             return worldSheet.First();
         }
@@ -346,8 +347,7 @@ public class Util
 
     public static string GetRegionCode(World world)
     {
-        Service.PluginLog.Info($"{world.DataCenter?.Value?.Region}");
-        return world.DataCenter?.Value?.Region switch
+        return world.DataCenter.ValueNullable?.Region switch
         {
             1 => "JP",
             2 => "NA",
@@ -371,5 +371,34 @@ public class Util
     public static float Round(float value)
     {
         return (float)Math.Round(value);
+    }
+
+    public static bool TryGetFirst<T>(IEnumerable<T> values, out T result) where T : struct
+    {
+        using var e = values.GetEnumerator();
+        if (e.MoveNext())
+        {
+            result = e.Current;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    public static bool TryGetFirst<T>(IEnumerable<T> values, Predicate<T> predicate, out T result) where T : struct
+    {
+        using var e = values.GetEnumerator();
+        while (e.MoveNext())
+        {
+            if (predicate(e.Current))
+            {
+                result = e.Current;
+                return true;
+            }
+        }
+
+        result = default;
+        return false;
     }
 }

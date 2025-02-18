@@ -5,6 +5,7 @@ using System.Numerics;
 using Dalamud.Interface;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 
 namespace FFLogsViewer.GUI.Main;
@@ -17,7 +18,9 @@ public class HeaderBar
 
     public void Draw()
     {
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(4 * ImGuiHelpers.GlobalScale, ImGui.GetStyle().ItemSpacing.Y));
+        using var style = ImRaii.PushStyle(
+            ImGuiStyleVar.ItemSpacing,
+            new Vector2(4 * ImGuiHelpers.GlobalScale, ImGui.GetStyle().ItemSpacing.Y));
 
         var buttonsWidth = GetButtonsWidth();
         var minWindowSize = GetMinWindowSize();
@@ -91,7 +94,7 @@ public class HeaderBar
 
         this.DrawPartyMembersPopup();
 
-        ImGui.PopStyleVar();
+        style.Pop();
 
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2);
 
@@ -100,13 +103,15 @@ public class HeaderBar
             var message = FFLogsClient.IsConfigSet()
                               ? Service.Localization.GetString("Main_InvalidAPIClient")
                               : Service.Localization.GetString("Main_APIClientNotSetup");
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.0f, 0.0f, 1.0f));
+
+            using var color = ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.0f, 0.0f, 1.0f));
+
             if (Util.CenterSelectable(message))
             {
                 Service.ConfigWindow.IsOpen = true;
             }
 
-            ImGui.PopStyleColor();
+            color.Pop();
 
             return;
         }
@@ -157,7 +162,7 @@ public class HeaderBar
 
     private static float GetButtonsWidth()
     {
-        ImGui.PushFont(UiBuilder.IconFont);
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
         var buttonsWidth =
             ImGui.CalcTextSize(FontAwesomeIcon.Search.ToIconString()).X +
             ImGui.CalcTextSize(FontAwesomeIcon.Crosshairs.ToIconString()).X +
@@ -165,7 +170,7 @@ public class HeaderBar
             ImGui.CalcTextSize(FontAwesomeIcon.UsersCog.ToIconString()).X +
             (ImGui.GetStyle().ItemSpacing.X * 4) + // between items
             (ImGui.GetStyle().FramePadding.X * 8); // around buttons, 2 per
-        ImGui.PopFont();
+        font.Pop();
         return Util.Round(buttonsWidth);
     }
 
@@ -199,16 +204,27 @@ public class HeaderBar
         {
             if (ImGui.BeginTable("##PartyListTable", 3, ImGuiTableFlags.RowBg))
             {
+                uint? currentAllianceIndex = null;
                 for (var i = 0; i < partyList.Count; i++)
                 {
+                    var partyMember = partyList[i];
+
                     if (i != 0)
                     {
                         ImGui.TableNextRow();
+
+                        // mark the separation between alliances
+                        if (partyMember.AllianceIndex != currentAllianceIndex)
+                        {
+                            ImGui.TableNextRow();
+                            ImGui.TableNextRow();
+                        }
+
+                        currentAllianceIndex = partyMember.AllianceIndex;
                     }
 
                     ImGui.TableNextColumn();
 
-                    var partyMember = partyList[i];
                     var iconSize = Util.Round(25 * ImGuiHelpers.GlobalScale);
                     var middleCursorPosY = ImGui.GetCursorPosY() + (iconSize / 2) - (ImGui.GetFontSize() / 2);
 
