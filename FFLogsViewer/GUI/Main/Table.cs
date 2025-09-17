@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Textures;
@@ -10,7 +12,6 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
 using FFLogsViewer.Manager;
 using FFLogsViewer.Model;
-using ImGuiNET;
 
 namespace FFLogsViewer.GUI.Main;
 
@@ -345,7 +346,7 @@ public class Table
                 ImGui.TableNextColumn();
 
                 Util.CenterCursor(iconSize);
-                ImGui.Image(Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Util.GetJobIconId(charData?.JobId ?? 0))).GetWrapOrEmpty().ImGuiHandle, new Vector2(iconSize));
+                ImGui.Image(Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Util.GetJobIconId(charData?.JobId ?? 0))).GetWrapOrEmpty().Handle, new Vector2(iconSize));
 
                 if (charData != null)
                 {
@@ -599,7 +600,7 @@ public class Table
                 ImGui.TableNextColumn();
                 var iconSize = Util.Round(25 * ImGuiHelpers.GlobalScale);
                 var middleCursorPosY = ImGui.GetCursorPosY() + (iconSize / 2) - (ImGui.GetFontSize() / 2);
-                ImGui.Image(Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Util.GetJobIconId(charData?.JobId ?? 0))).GetWrapOrEmpty().ImGuiHandle, new Vector2(iconSize));
+                ImGui.Image(Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Util.GetJobIconId(charData?.JobId ?? 0))).GetWrapOrEmpty().Handle, new Vector2(iconSize));
 
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(middleCursorPosY);

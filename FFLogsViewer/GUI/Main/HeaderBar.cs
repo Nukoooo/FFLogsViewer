@@ -2,11 +2,12 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
-using ImGuiNET;
 
 namespace FFLogsViewer.GUI.Main;
 
@@ -234,7 +235,7 @@ public class HeaderBar
                     }
 
                     ImGui.SameLine();
-                    ImGui.Image(Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Util.GetJobIconId(partyMember.JobId))).GetWrapOrEmpty().ImGuiHandle, new Vector2(iconSize));
+                    ImGui.Image(Service.TextureProvider.GetFromGameIcon(new GameIconLookup(Util.GetJobIconId(partyMember.JobId))).GetWrapOrEmpty().Handle, new Vector2(iconSize));
 
                     ImGui.TableNextColumn();
 
