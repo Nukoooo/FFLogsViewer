@@ -1,0 +1,27 @@
+[
+  {
+    "Author": "Aireil, Nuko",
+    "Name": "FF Logs Viewer (CN)",
+    "Description": "View FF Logs ranking percentiles in-game. Add a context menu to open someone's logs. Layout, style, stats, default metric, and more are all customizable in the settings.",
+    "Punchline": "View FF Logs ranking percentiles in-game.",
+    "InternalName": "FFLogsViewer",
+    "AssemblyVersion": "2.3.0.0",
+    "RepoUrl": "https://github.com/YouShux/FFLogsViewer",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 13,
+    "IconUrl": "https://raw.githubusercontent.com/YouShux/FFLogsViewer/CN-Ver/res/icon.png",
+    "ImageUrls": [
+      "https://raw.githubusercontent.com/YouShux/FFLogsViewer/CN-Ver/res/image1.png",
+      "https://raw.githubusercontent.com/YouShux/FFLogsViewer/CN-Ver/res/image2.png"
+    ],
+    "Tags": ["FFLogs"],
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadLinkInstall": "https://github.com/YouShux/FFLogsViewer/releases/latest/download/FFLogsViewer.zip",
+    "DownloadLinkUpdate": "https://github.com/YouShux/FFLogsViewer/releases/latest/download/FFLogsViewer.zip",
+    "TestingAssemblyVersion": null,
+    "DownloadLinkTesting": null,
+    "Changelog": "-2.3.0.0\n    Default layout update + 7.3 update.",
+    "LastUpdate": "1762570215"
+  }
+]

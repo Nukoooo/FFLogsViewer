@@ -4,6 +4,12 @@
     <Authors>Aireil</Authors>
     <Version>2.3.0.0</Version>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <OutputPath>D:\插件\FFLogsViewer</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <OutputPath>D:\插件\FFLogsViewer</OutputPath>
+  </PropertyGroup>
 
   <ItemGroup>
     <None Remove="stylecop.json" />
