@@ -1,8 +1,10 @@
 using System;
 using Dalamud.Game.ClientState.Keys;
-using Dalamud.Game.Gui.PartyFinder.Types;
 using Dalamud.Hooking;
 using Dalamud.Memory;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace FFLogsViewer.Manager;
@@ -20,16 +22,16 @@ public unsafe class OpenWithManager
     private nint processPartyFinderDetailPacketAddress;
     private nint atkUnitBaseFinalizeAddress;
 
-    private delegate void* CharaCardAtkCreationDelegate(nint agentCharaCard);
+    private delegate void* CharaCardAtkCreationDelegate(AgentCharaCard* agentCharaCard);
     private Hook<CharaCardAtkCreationDelegate>? charaCardAtkCreationHook;
 
-    private delegate void* ProcessInspectPacketDelegate(void* someAgent, void* a2, nint packetData);
+    private delegate void* ProcessInspectPacketDelegate(Inspect* inspect, void* a2, nint packetData);
     private Hook<ProcessInspectPacketDelegate>? processInspectPacketHook;
 
-    private delegate void* SocialDetailAtkCreationDelegate(void* someAgent, nint data, long a3, void* a4);
+    private delegate void* SocialDetailAtkCreationDelegate(void* someAgent, InfoProxyCommonList.CharacterData* data, long a3, void* a4);
     private Hook<SocialDetailAtkCreationDelegate>? socialDetailAtkCreationHook;
 
-    private delegate void* ProcessPartyFinderDetailPacketDelegate(nint someAgent, nint packetData);
+    private delegate void* ProcessPartyFinderDetailPacketDelegate(nint someAgent, AgentLookingForGroup.Detailed* data);
     private Hook<ProcessPartyFinderDetailPacketDelegate>? processPartyFinderDetailPacketHook;
 
     private delegate void AtkUnitBaseFinalizeDelegate(AtkUnitBase* addon);
@@ -78,7 +80,7 @@ public unsafe class OpenWithManager
         return true;
     }
 
-    private void Open(nint fullNamePtr, ushort worldId)
+    private void Open(string fullName, ushort worldId)
     {
         if (!IsEnabled())
         {
@@ -91,15 +93,14 @@ public unsafe class OpenWithManager
             return;
         }
 
-        var fullName = MemoryHelper.ReadStringNullTerminated(fullNamePtr);
         if (fullName == string.Empty)
         {
             return;
         }
 
         if (Service.Configuration.OpenWith.ShouldIgnoreSelf
-            && Service.ClientState.LocalPlayer?.Name.TextValue == fullName
-            && Service.ClientState.LocalPlayer?.HomeWorld.RowId == worldId)
+            && Service.PlayerState.CharacterName == fullName
+            && Service.PlayerState.HomeWorld.RowId == worldId)
         {
             return;
         }
@@ -123,7 +124,7 @@ public unsafe class OpenWithManager
         {
             this.charaCardAtkCreationAddress = Service.SigScanner.ScanText("E8 ?? ?? ?? ?? 48 8B 74 24 48 48 8B 5C 24 40 48 83 C4 30 5F C3 66 90");
             this.processInspectPacketAddress = Service.SigScanner.ScanText("E8 ?? ?? ?? ?? 0F B6 07 84 C0 74 11");
-            this.socialDetailAtkCreationAddress = Service.SigScanner.ScanText("E8 ?? ?? ?? ?? E9 ?? ?? ?? ?? 48 8B 8B 78 0F 00 00 BF 00 00 00 E0");
+            this.socialDetailAtkCreationAddress = Service.SigScanner.ScanText("E8 ?? ?? ?? ?? E9 ?? ?? ?? ?? 48 8B 8B ?? 0F 00 00 BF 00 00 00 E0");
             this.processPartyFinderDetailPacketAddress = Service.SigScanner.ScanText("E9 ?? ?? ?? ?? CC CC CC CC CC CC 48 89 5C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 55 48 8D AC 24");
             this.atkUnitBaseFinalizeAddress = Service.SigScanner.ScanText("E8 ?? ?? ?? ?? 45 33 C9 8D 57 01 41 B8");
 
@@ -176,7 +177,7 @@ public unsafe class OpenWithManager
         this.HasBeenEnabled = true;
     }
 
-    private void* CharaCardAtkCreationDetour(nint agentCharaCard)
+    private void* CharaCardAtkCreationDetour(AgentCharaCard* agentCharaCard)
     {
         try
         {
@@ -184,11 +185,10 @@ public unsafe class OpenWithManager
                 && Service.GameGui.GetAddonByName("BannerEditor", 0) == IntPtr.Zero
                 && Service.GameGui.GetAddonByName("CharaCardDesignSetting", 0) == IntPtr.Zero)
             {
-                // To get offsets: 7.0 process chara card network packet (NOT the hooked one) 40 55 53 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 85 ?? ?? ?? ?? 48 83 79 ?? ?? 48 8B DA
-                var fullNamePtr = *(nint*)(*(nint*)(agentCharaCard + 40) + 96);
-                var worldId = *(ushort*)(*(nint*)(agentCharaCard + 40) + 200);
+                var fullName = agentCharaCard->Data->Name.ToString();
+                var worldId = agentCharaCard->Data->WorldId;
 
-                this.Open(fullNamePtr, worldId);
+                this.Open(fullName, worldId);
             }
         }
         catch (Exception ex)
@@ -199,17 +199,19 @@ public unsafe class OpenWithManager
         return this.charaCardAtkCreationHook!.Original(agentCharaCard);
     }
 
-    private void* ProcessInspectPacketDetour(void* someAgent, void* a2, nint packetData)
+    private void* ProcessInspectPacketDetour(Inspect* inspect, void* a2, nint packetData)
     {
+        // execute the original function first so the values get assigned in inspect
+        var original = this.processInspectPacketHook!.Original(inspect, a2, packetData);
+
         try
         {
             if (Service.Configuration.OpenWith.IsExamineEnabled)
             {
-                // To get offsets: 7.1 process inspect network packet E8 ?? ?? ?? ?? 0F B6 07 84 C0 74 11
-                var fullNamePtr = packetData + 640;
-                var worldId = *(ushort*)(packetData + 50);
+                var fullName = inspect->NameString;
+                var worldId = (ushort)inspect->WorldId;
 
-                this.Open(fullNamePtr, worldId);
+                this.Open(fullName, worldId);
             }
         }
         catch (Exception ex)
@@ -217,21 +219,20 @@ public unsafe class OpenWithManager
             Service.PluginLog.Error(ex, "Exception in ProcessInspectPacketDetour.");
         }
 
-        return this.processInspectPacketHook!.Original(someAgent, a2, packetData);
+        return original;
     }
 
-    private void* SocialDetailAtkCreationDetour(void* someAgent, nint data, long a3, void* a4)
+    private void* SocialDetailAtkCreationDetour(void* someAgent, InfoProxyCommonList.CharacterData* data, long a3, void* a4)
     {
         try
         {
             // a3 != 0 => editing
             if (Service.Configuration.OpenWith.IsSearchInfoEnabled && a3 == 0)
             {
-                // To get offsets: look in the function
-                var fullNamePtr = data + 50;
-                var worldId = *(ushort*)(data + 40);
+                var fullName = data->NameString;
+                var worldId = data->HomeWorld;
 
-                this.Open(fullNamePtr, worldId);
+                this.Open(fullName, worldId);
             }
         }
         catch (Exception ex)
@@ -242,21 +243,20 @@ public unsafe class OpenWithManager
         return this.socialDetailAtkCreationHook!.Original(someAgent, data, a3, a4);
     }
 
-    private void* ProcessPartyFinderDetailPacketDetour(nint someAgent, nint packetData)
+    private void* ProcessPartyFinderDetailPacketDetour(nint someAgent, AgentLookingForGroup.Detailed* data)
     {
         try
         {
             if (Service.Configuration.OpenWith.IsPartyFinderEnabled)
             {
-                // To get offsets: 6.28, look in this function
-                var hasFailed = *(byte*)(packetData + 92) == 0;
-                var isPrivate = ((SearchAreaFlags)(*(byte*)(packetData + 91))).HasFlag(SearchAreaFlags.Private);
+                var hasFailed = data->LastPatchHotfixTimestamp == 0; // previously 92/0x5C was checked, but that's not documented in CS yet. this works as a replacement.
+                var isPrivate = data->JoinConditionFlags.HasFlag(AgentLookingForGroup.JoinCondition.PrivateParty);
                 var isJoining = this.isJoiningPartyFinderOffset != 0 && *(byte*)(someAgent + this.isJoiningPartyFinderOffset) != 0;
 
                 if (!hasFailed && !isPrivate && !isJoining)
                 {
-                    var fullName = packetData + 912;
-                    var worldId = *(ushort*)(packetData + 82); // is not used in the function, just search it again if it breaks
+                    var fullName = data->LeaderString;
+                    var worldId = data->HomeWorld; // is not used in the function, just search it again if it breaks
 
                     this.Open(fullName, worldId);
                 }
@@ -267,7 +267,7 @@ public unsafe class OpenWithManager
             Service.PluginLog.Error(ex, "Exception in ProcessPartyFinderDetailPacketDetour.");
         }
 
-        return this.processPartyFinderDetailPacketHook!.Original(someAgent, packetData);
+        return this.processPartyFinderDetailPacketHook!.Original(someAgent, data);
     }
 
     private void AktUnitBaseFinalizeDetour(AtkUnitBase* addon)
